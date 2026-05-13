@@ -16,9 +16,6 @@ const AVATARS = [
 
 // ─── État ────────────────────────────────────────────────────
 const S = {
-  pusher: null,
-  roomChannel: null,
-  playerChannel: null,
   roomCode: null,
   playerId: generateLocalId(),
   myName: null,
@@ -31,7 +28,9 @@ const S = {
   hasVoted: false,
   timerInterval: null,
   timerValue: 0,
-  avatarTarget: null
+  avatarTarget: null,
+  pollInterval: null,
+  lastChatTs: 0
 };
 
 // ─── ID persistant par onglet ────────────────────────────────
@@ -54,108 +53,30 @@ async function api(endpoint, body) {
 }
 
 // ─── Pusher init ─────────────────────────────────────────────
-async function initPusher() {
-  // Charge key/cluster depuis le serveur (évite de hardcoder dans le HTML)
+async function initPusher() { return true; }
+
+function subscribeRoom(code) { startPolling(code); }
+
+function subscribePlayer(playerId) { }
+
+function startPolling(code) {
+  stopPolling();
+  S.pollInterval = setInterval(refreshState, 1000);
+  refreshState();
+}
+function stopPolling(){ if (S.pollInterval) { clearInterval(S.pollInterval); S.pollInterval = null; } }
+async function refreshState() {
+  if (!S.roomCode) return;
   try {
-    const res = await fetch('/api/config', { cache: 'no-store' });
-    const cfg = await res.json();
-    PUSHER_KEY     = (cfg.pusherKey || cfg.key || '').trim();
-    PUSHER_CLUSTER = (cfg.pusherCluster || cfg.cluster || 'eu').trim();
-  } catch(e) {
-    console.error('Impossible de charger la config Pusher', e);
-    showToast('Erreur de configuration serveur', 'error');
-    return;
-  }
-  if (!PUSHER_KEY) {
-    console.error('PUSHER_KEY manquante dans /api/config');
-    showToast('PUSHER_KEY manquante: vérifie les variables Vercel puis redeploie', 'error');
-    return false;
-  }
-
-  S.pusher = new Pusher(PUSHER_KEY, { cluster: PUSHER_CLUSTER });
-  return true;
-}
-
-function subscribeRoom(code) {
-  if (S.roomChannel) S.roomChannel.unbind_all();
-  S.roomChannel = S.pusher.subscribe(`room-${code}`);
-
-  S.roomChannel.bind('room-update', data => {
-    if (data.players) S.players = data.players;
-    if (data.config)  S.config = data.config;
-    if (data.hostId)  S.hostId = data.hostId;
-    renderLobby();
-  });
-
-  S.roomChannel.bind('game-started', data => {
-    S.players = data.players;
-    S.phase = 'role';
-    Sounds.start();
-    document.getElementById('lobby-round-badge').textContent = `Manche ${data.round}`;
-    document.getElementById('lobby-round-badge').classList.remove('hidden');
-  });
-
-  S.roomChannel.bind('phase-change', data => {
-    S.phase = data.phase;
-    if (data.players) S.players = data.players;
-    if (data.phase === 'discussion') {
-      showScreen('game');
-      updateGamePhase('discussion');
-      startClientTimer(S.config.timer);
-    } else if (data.phase === 'vote') {
-      S.hasVoted = false;
-      updateGamePhase('vote');
-      stopClientTimer();
-      startClientTimer(30);
-    }
-  });
-
-  S.roomChannel.bind('vote-update', data => {
-    S.players = data.players;
-    renderGamePlayers();
-  });
-
-  S.roomChannel.bind('vote-result', data => {
-    showVoteResultOverlay(data.tie, data.eliminated);
-    if (data.eliminated) Sounds.eliminate();
-    setTimeout(() => document.getElementById('overlay-vote-result').classList.add('hidden'), 4000);
-  });
-
-  S.roomChannel.bind('game-over', data => {
-    stopClientTimer();
-    S.phase = 'result';
-    Sounds.win(data.winner);
-    showResultScreen(data.winner, data.players, data.hostId);
-  });
-
-  S.roomChannel.bind('chat', msg => {
-    appendChat(msg);
-    if (msg.type !== 'system' && msg.senderId !== S.playerId) Sounds.chat();
-  });
-
-  S.roomChannel.bind('player-left', data => {
-    S.players = data.players;
-    S.hostId = data.hostId;
+    const data = await api('state', { roomCode: S.roomCode, playerId: S.playerId });
+    const room = data.room;
+    const prevPhase = S.phase;
+    S.players = room.players; S.config = room.config; S.hostId = room.hostId; S.phase = room.phase;
     if (S.phase === 'lobby') renderLobby();
-    else renderGamePlayers();
-  });
-
-  S.roomChannel.bind('new-host', data => {
-    S.hostId = data.hostId;
-    if (S.playerId === data.hostId) showToast('Tu es maintenant l\'hôte !', 'info');
-    renderLobby();
-  });
-}
-
-function subscribePlayer(playerId) {
-  if (S.playerChannel) S.playerChannel.unbind_all();
-  S.playerChannel = S.pusher.subscribe(`player-${playerId}`);
-
-  S.playerChannel.bind('your-role', data => {
-    S.myRole = data.role;
-    Sounds.roleReveal(data.isImpostor);
-    showRoleOverlay(data.role, data.customRole, data.isImpostor);
-  });
+    else if (S.phase === 'result') { stopClientTimer(); showResultScreen('crewmates', S.players, S.hostId); }
+    else { showScreen('game'); updateGamePhase(S.phase === 'vote' ? 'vote' : 'discussion'); }
+    (room.chat || []).forEach(m => { if ((m.timestamp||0) > S.lastChatTs) { appendChat(m); S.lastChatTs = m.timestamp||S.lastChatTs; } });
+  } catch (e) {}
 }
 
 // ─── Actions utilisateur ─────────────────────────────────────
