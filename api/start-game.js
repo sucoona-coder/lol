@@ -20,7 +20,7 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { roomCode, playerId } = req.body;
-  const room = getRoom(roomCode);
+  const room = await getRoom(roomCode);
 
   if (!room) return res.status(404).json({ error: 'Room introuvable.' });
   if (room.hostId !== playerId) return res.status(403).json({ error: 'Pas l\'hôte.' });
@@ -43,7 +43,7 @@ module.exports = async (req, res) => {
     p.hasVoted = false;
   });
 
-  setRoom(roomCode, room);
+  await setRoom(roomCode, room);
 
   // 1. Annonce que la partie commence (sans rôles)
   await pusher.trigger(`room-${roomCode}`, 'game-started', {

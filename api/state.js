@@ -9,7 +9,7 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { roomCode, playerId } = req.body;
-  const room = getRoom((roomCode || '').toUpperCase());
+  const room = await getRoom((roomCode || '').toUpperCase());
   if (!room) return res.status(404).json({ error: 'Room introuvable.' });
   return res.status(200).json({ room: sanitizeRoom(room, playerId) });
 };

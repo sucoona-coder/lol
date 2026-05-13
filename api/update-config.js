@@ -10,7 +10,7 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { roomCode, playerId, impostorCount, timer, roles } = req.body;
-  const room = getRoom(roomCode);
+  const room = await getRoom(roomCode);
 
   if (!room) return res.status(404).json({ error: 'Room introuvable.' });
   if (room.hostId !== playerId) return res.status(403).json({ error: 'Pas l\'hôte.' });
@@ -22,7 +22,7 @@ module.exports = async (req, res) => {
   if (roles?.impostor) room.config.roles.impostor = roles.impostor.substring(0, 30);
   if (roles?.crewmate) room.config.roles.crewmate = roles.crewmate.substring(0, 30);
 
-  setRoom(roomCode, room);
+  await setRoom(roomCode, room);
 
   await pusher.trigger(`room-${roomCode}`, 'room-update', {
     config: room.config,

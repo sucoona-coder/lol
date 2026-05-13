@@ -10,7 +10,7 @@ module.exports = async (req, res) => {
 
   const { roomCode, playerName, avatar, playerId } = req.body;
   const code = (roomCode || '').toUpperCase().trim();
-  const room = getRoom(code);
+  const room = await getRoom(code);
 
   if (!room) return res.status(404).json({ error: 'Room introuvable.' });
   if (room.phase !== 'lobby') return res.status(400).json({ error: 'Partie déjà en cours.' });
@@ -21,6 +21,6 @@ module.exports = async (req, res) => {
     room.chat.push({ type: 'system', text: `${room.players[playerId].name} a rejoint la partie !`, timestamp: Date.now() });
   }
 
-  setRoom(code, room);
+  await setRoom(code, room);
   return res.status(200).json({ code, room: sanitizeRoom(room, playerId) });
 };

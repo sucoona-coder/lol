@@ -12,7 +12,7 @@ module.exports = async (req, res) => {
   const { playerName, avatar, playerId } = req.body;
   if (!playerName || !playerId) return res.status(400).json({ error: 'Champs manquants' });
 
-  const code = generateCode();
+  const code = await generateCode();
   const player = {
     id: playerId,
     name: playerName.trim().substring(0, 20),
@@ -39,7 +39,7 @@ module.exports = async (req, res) => {
     chat: []
   };
 
-  setRoom(code, room);
+  await setRoom(code, room);
 
   return res.status(200).json({ code, room: sanitizeRoom(room, playerId) });
 };

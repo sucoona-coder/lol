@@ -8,7 +8,7 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { roomCode, playerId, text } = req.body;
-  const room = getRoom(roomCode);
+  const room = await getRoom(roomCode);
   if (!room) return res.status(404).json({ error: 'Room introuvable.' });
   const player = room.players[playerId];
   if (!player) return res.status(403).json({ error: 'Joueur inconnu.' });
@@ -16,6 +16,6 @@ module.exports = async (req, res) => {
 
   const msg = { type: 'player', senderId: playerId, senderName: player.name, senderAvatar: player.avatar, text: (text || '').trim().substring(0, 200), isAlive: player.isAlive, timestamp: Date.now() };
   room.chat.push(msg);
-  setRoom(roomCode, room);
+  await setRoom(roomCode, room);
   return res.status(200).json({ ok: true });
 };

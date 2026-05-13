@@ -10,7 +10,7 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { roomCode, playerId } = req.body;
-  const room = getRoom(roomCode);
+  const room = await getRoom(roomCode);
   if (!room) return res.status(200).json({ ok: true });
 
   const player = room.players[playerId];
@@ -18,7 +18,7 @@ module.exports = async (req, res) => {
   delete room.players[playerId];
 
   if (Object.keys(room.players).length === 0) {
-    deleteRoom(roomCode);
+      await deleteRoom(roomCode);
     return res.status(200).json({ ok: true });
   }
 
@@ -28,7 +28,7 @@ module.exports = async (req, res) => {
     await pusher.trigger(`room-${roomCode}`, 'new-host', { hostId: room.hostId });
   }
 
-  setRoom(roomCode, room);
+  await setRoom(roomCode, room);
 
   await pusher.trigger(`room-${roomCode}`, 'player-left', {
     playerId,

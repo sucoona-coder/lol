@@ -35,7 +35,7 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { roomCode, playerId, targetId } = req.body;
-  const room = getRoom(roomCode);
+  const room = await getRoom(roomCode);
   if (!room) return res.status(404).json({ error: 'Room introuvable.' });
   if (room.phase !== 'vote') return res.status(400).json({ error: 'Pas en phase vote.' });
 
@@ -47,7 +47,7 @@ module.exports = async (req, res) => {
   // Enregistre le vote
   room.votes[playerId] = targetId;
   voter.hasVoted = true;
-  setRoom(roomCode, room);
+  await setRoom(roomCode, room);
 
   // Notifie l'avancement des votes
   const alive = Object.values(room.players).filter(p => p.isAlive);
@@ -70,7 +70,7 @@ module.exports = async (req, res) => {
     if (!result.tie && result.eliminated) {
       const elim = room.players[result.eliminated];
       elim.isAlive = false;
-      setRoom(roomCode, room);
+      await setRoom(roomCode, room);
 
       await pusher.trigger(`room-${roomCode}`, 'vote-result', {
         tie: false,
@@ -87,7 +87,7 @@ module.exports = async (req, res) => {
     const winner = checkWin(room);
     if (winner) {
       room.phase = 'result';
-      setRoom(roomCode, room);
+      await setRoom(roomCode, room);
       await pusher.trigger(`room-${roomCode}`, 'game-over', {
         winner,
         players: Object.values(room.players).map(p => ({
@@ -100,12 +100,12 @@ module.exports = async (req, res) => {
     } else {
       // Retour discussion
       setTimeout(async () => {
-        const r = getRoom(roomCode);
+        const r = await getRoom(roomCode);
         if (!r || r.phase === 'result') return;
         r.phase = 'discussion';
         r.votes = {};
         Object.values(r.players).forEach(p => { p.hasVoted = false; });
-        setRoom(roomCode, r);
+        await setRoom(roomCode, r);
         await pusher.trigger(`room-${roomCode}`, 'phase-change', {
           phase: 'discussion',
           players: Object.values(r.players).map(p => ({
