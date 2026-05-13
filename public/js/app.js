@@ -57,16 +57,23 @@ async function api(endpoint, body) {
 async function initPusher() {
   // Charge key/cluster depuis le serveur (évite de hardcoder dans le HTML)
   try {
-    const res = await fetch('/api/config');
+    const res = await fetch('/api/config', { cache: 'no-store' });
     const cfg = await res.json();
-    PUSHER_KEY     = cfg.pusherKey;
-    PUSHER_CLUSTER = cfg.pusherCluster || 'eu';
+    PUSHER_KEY     = (cfg.pusherKey || cfg.key || '').trim();
+    PUSHER_CLUSTER = (cfg.pusherCluster || cfg.cluster || 'eu').trim();
   } catch(e) {
     console.error('Impossible de charger la config Pusher', e);
     showToast('Erreur de configuration serveur', 'error');
     return;
   }
+  if (!PUSHER_KEY) {
+    console.error('PUSHER_KEY manquante dans /api/config');
+    showToast('PUSHER_KEY manquante: vérifie les variables Vercel puis redeploie', 'error');
+    return false;
+  }
+
   S.pusher = new Pusher(PUSHER_KEY, { cluster: PUSHER_CLUSTER });
+  return true;
 }
 
 function subscribeRoom(code) {
@@ -503,7 +510,8 @@ function esc(str) {
 // ─── Boot ────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
-  await initPusher();
+  const pusherReady = await initPusher();
+  if (!pusherReady) return;
   document.addEventListener('click', () => Sounds.init(), { once: true });
 
   // Home
