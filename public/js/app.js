@@ -75,6 +75,7 @@ async function refreshState() {
       if (!String(err.message || '').includes('404')) throw err;
       data = await api('room-state', { roomCode: S.roomCode, playerId: S.playerId });
     }
+    const data = await api('state', { roomCode: S.roomCode, playerId: S.playerId });
     const room = data.room;
     const prevPhase = S.phase;
     S.players = room.players; S.config = room.config; S.hostId = room.hostId; S.phase = room.phase;
