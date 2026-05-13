@@ -1,0 +1,65 @@
+// api/create-room.js
+const pusher = require('../lib/pusher');
+const { generateCode, setRoom } = require('../lib/store');
+
+module.exports = async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).end();
+
+  const { playerName, avatar, playerId } = req.body;
+  if (!playerName || !playerId) return res.status(400).json({ error: 'Champs manquants' });
+
+  const code = generateCode();
+  const player = {
+    id: playerId,
+    name: playerName.trim().substring(0, 20),
+    avatar: avatar || '🧑',
+    isAlive: true,
+    hasVoted: false,
+    role: null,
+    customRole: null
+  };
+
+  const room = {
+    code,
+    hostId: playerId,
+    players: { [playerId]: player },
+    phase: 'lobby',
+    config: {
+      impostorCount: 1,
+      timer: 60,
+      roles: { impostor: 'Imposteur', crewmate: 'Équipier' }
+    },
+    votes: {},
+    round: 0,
+    timerEnd: null
+  };
+
+  setRoom(code, room);
+
+  return res.status(200).json({ code, room: sanitizeRoom(room, playerId) });
+};
+
+function sanitizeRoom(room, playerId) {
+  return {
+    code: room.code,
+    hostId: room.hostId,
+    phase: room.phase,
+    config: room.config,
+    players: Object.values(room.players).map(p => ({
+      id: p.id,
+      name: p.name,
+      avatar: p.avatar,
+      isAlive: p.isAlive,
+      hasVoted: p.hasVoted,
+      isHost: p.id === room.hostId,
+      // Révèle le rôle seulement au joueur concerné ou en fin de partie
+      role: (p.id === playerId || room.phase === 'result') ? p.role : null,
+      customRole: (p.id === playerId || room.phase === 'result') ? p.customRole : null,
+      votedBy: Object.values(room.votes).filter(v => v === p.id).length
+    }))
+  };
+}
