@@ -1,6 +1,6 @@
 // api/create-room.js
-const pusher = require('../lib/pusher');
 const { generateCode, setRoom } = require('../lib/store');
+const { sanitizeRoom } = require('../lib/room-view');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -35,7 +35,8 @@ module.exports = async (req, res) => {
     },
     votes: {},
     round: 0,
-    timerEnd: null
+    timerEnd: null,
+    chat: []
   };
 
   setRoom(code, room);
@@ -43,23 +44,3 @@ module.exports = async (req, res) => {
   return res.status(200).json({ code, room: sanitizeRoom(room, playerId) });
 };
 
-function sanitizeRoom(room, playerId) {
-  return {
-    code: room.code,
-    hostId: room.hostId,
-    phase: room.phase,
-    config: room.config,
-    players: Object.values(room.players).map(p => ({
-      id: p.id,
-      name: p.name,
-      avatar: p.avatar,
-      isAlive: p.isAlive,
-      hasVoted: p.hasVoted,
-      isHost: p.id === room.hostId,
-      // Révèle le rôle seulement au joueur concerné ou en fin de partie
-      role: (p.id === playerId || room.phase === 'result') ? p.role : null,
-      customRole: (p.id === playerId || room.phase === 'result') ? p.customRole : null,
-      votedBy: Object.values(room.votes).filter(v => v === p.id).length
-    }))
-  };
-}
