@@ -68,6 +68,13 @@ function stopPolling(){ if (S.pollInterval) { clearInterval(S.pollInterval); S.p
 async function refreshState() {
   if (!S.roomCode) return;
   try {
+    let data;
+    try {
+      data = await api('state', { roomCode: S.roomCode, playerId: S.playerId });
+    } catch (err) {
+      if (!String(err.message || '').includes('404')) throw err;
+      data = await api('room-state', { roomCode: S.roomCode, playerId: S.playerId });
+    }
     const data = await api('state', { roomCode: S.roomCode, playerId: S.playerId });
     const room = data.room;
     const prevPhase = S.phase;
