@@ -66,7 +66,14 @@ async function initPusher() {
     showToast('Erreur de configuration serveur', 'error');
     return;
   }
+  if (!PUSHER_KEY) {
+    console.error('PUSHER_KEY manquante dans /api/config');
+    showToast('Configuration temps réel manquante (PUSHER_KEY)', 'error');
+    return false;
+  }
+
   S.pusher = new Pusher(PUSHER_KEY, { cluster: PUSHER_CLUSTER });
+  return true;
 }
 
 function subscribeRoom(code) {
@@ -503,7 +510,8 @@ function esc(str) {
 // ─── Boot ────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
-  await initPusher();
+  const pusherReady = await initPusher();
+  if (!pusherReady) return;
   document.addEventListener('click', () => Sounds.init(), { once: true });
 
   // Home
